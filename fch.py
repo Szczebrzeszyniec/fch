@@ -18,33 +18,59 @@ HIST = os.path.expanduser("~/.fch-history.yaml")
 ICON = os.path.expanduser("~/.fch.png")
 HISTORY = []
 
+# HISTLIM = 3
+# HISTMAX = 5 + HISTLIM
+# HISTSTORE = 0
+
 def check():
     if not os.path.exists(CONF):
-        open(CONF, "w").close()
+        with open(CONF, "w", encoding="utf-8") as f:
+            yaml.safe_dump({}, f)
     if not os.path.exists(HIST):
         with open(HIST, "w", encoding="utf-8") as f:
             yaml.safe_dump([], f)
 
 def read(key):
-    with open(CONF, "r") as f:
-        data = yaml.safe_load(f) or {}
+    try:
+        with open(CONF, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+    except Exception:
+        data = {}
     return data.get(key)
 
 def readAll():
-    with open(CONF, "r") as f:
-        data = yaml.safe_load(f) or {}
+    try:
+        with open(CONF, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+    except Exception:
+        data = {}
     return list(data.keys())
-
 
 def write(name, conf):
     try:
-        with open(CONF, "r") as f:
+        with open(CONF, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
-    except FileNotFoundError:
+    except Exception:
         data = {}
     data[name] = conf
-    with open(CONF, "w") as f:
+    with open(CONF, "w", encoding="utf-8") as f:
         yaml.safe_dump(data, f, sort_keys=False)
+
+def getConfig():
+    global HISTLIM, HISTMAX, HISTSTORE
+    limit = read("limit")
+    if isinstance(limit, int) and limit >= 0:
+        HISTLIM = limit
+    extra_max = read("max")
+    if isinstance(extra_max, int) and extra_max >= 0:
+        HISTMAX = HISTLIM + extra_max
+    else:
+        HISTMAX = HISTLIM + 5
+    store = read("store")
+    if isinstance(store, int) and store >= 0:
+        HISTSTORE = store
+    else:
+        HISTSTORE = 0
 
 def loadHistory():
     global HISTORY
@@ -56,6 +82,9 @@ def loadHistory():
         HISTORY = []
 
 def saveHistory():
+    global HISTORY, HISTSTORE
+    if isinstance(HISTSTORE, int) and HISTSTORE > 0 and len(HISTORY) > HISTSTORE:
+        HISTORY = HISTORY[-HISTSTORE:]
     with open(HIST, "w", encoding="utf-8") as f:
         yaml.safe_dump(HISTORY, f, sort_keys=False)
 
@@ -72,18 +101,20 @@ def label(text, limit=40):
     return first_line or "(empty)"
 
 def on_select(icon, text):
-    pyperclip.copy(text)
+    try:
+        pyperclip.copy(text)
+    except Exception:
+        pass
 
 def quit(icon, item=None):
     icon.stop()
 
-
 def rebuildMenu(icon):
     items = []
     hist = list(reversed(HISTORY))
-    if len(hist) > 10:
-        visible = hist[:10]
-        remaining = hist[10:]
+    if len(hist) > HISTLIM:
+        visible = hist[:HISTLIM]
+        remaining = hist[HISTLIM:HISTMAX]
         for entry in visible:
             lbl = label(entry, 40)
             def make_cb(t):
@@ -114,7 +145,6 @@ def rebuildMenu(icon):
         icon.update_menu()
     except Exception:
         pass
-
 
 def appendHist(text):
     text = text.rstrip("\n")
@@ -152,6 +182,7 @@ def setup(icon):
 
 def main():
     check()
+    getConfig()
     image = makeIco()
     icon = pystray.Icon("fch", image, "Clipboard history")
     icon.visible = True
