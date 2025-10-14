@@ -1,6 +1,4 @@
 #!/usr/bin/python3
-# fch.py
-
 import time
 import yaml
 import os
@@ -8,27 +6,29 @@ import pystray
 from PIL import Image
 import pyperclip
 from threading import Thread
+import subprocess
 from AppKit import NSApplication, NSApplicationActivationPolicyProhibited
 
 app = NSApplication.sharedApplication()
 app.setActivationPolicy_(NSApplicationActivationPolicyProhibited)
 
-CONF = os.path.expanduser("~/.fch.yaml")
-HIST = os.path.expanduser("~/.fch-history.yaml")
-ICON = os.path.expanduser("~/.fch.png")
+CONF = os.path.expanduser("~/.ftools/fch/config.yaml")
+HIST = os.path.expanduser("~/.ftools/fch/history.yaml")
+ICON = os.path.expanduser("~/.ftools/fch/icon.png")
 HISTORY = []
-
-# HISTLIM = 3
-# HISTMAX = 5 + HISTLIM
-# HISTSTORE = 0
+HISTLIM = 3
+HISTMAX = 8
+HISTSTORE = 0
 
 def check():
+    os.makedirs(os.path.dirname(CONF), exist_ok=True)
     if not os.path.exists(CONF):
         with open(CONF, "w", encoding="utf-8") as f:
-            yaml.safe_dump({}, f)
+            yaml.safe_dump({"limit": 3, "max": 8, "store": 9999}, f)
     if not os.path.exists(HIST):
         with open(HIST, "w", encoding="utf-8") as f:
-            yaml.safe_dump([], f)
+            yaml.safe_dump("", f)
+
 
 def read(key):
     try:
@@ -139,7 +139,8 @@ def rebuildMenu(icon):
                     on_select(icon, t)
                 return cb
             items.append(pystray.MenuItem(lbl, make_cb(entry)))
-    items.append(pystray.MenuItem("Quit", quit))
+    items.append(pystray.MenuItem("Configure", confEdit))
+    # items.append(pystray.MenuItem("Quit", quit))
     icon.menu = pystray.Menu(*items)
     try:
         icon.update_menu()
@@ -174,15 +175,54 @@ def clipbWatch(icon, poll_interval=0.5):
             clipbOnchange(current, icon)
         time.sleep(poll_interval)
 
+def confEdit(icon=None, item=None):
+    subprocess.run(["open", "-e", CONF])
+
+def confWatch(icon, poll_interval=1.0):
+    last_conf_mtime = None
+    last_hist_mtime = None
+    while True:
+        try:
+            conf_mtime = os.path.getmtime(CONF) if os.path.exists(CONF) else None
+        except Exception:
+            conf_mtime = None
+        try:
+            hist_mtime = os.path.getmtime(HIST) if os.path.exists(HIST) else None
+        except Exception:
+            hist_mtime = None
+        if conf_mtime != last_conf_mtime:
+            last_conf_mtime = conf_mtime
+            try:
+                getConfig()
+            except Exception:
+                pass
+            try:
+                rebuildMenu(icon)
+            except Exception:
+                pass
+        if hist_mtime != last_hist_mtime:
+            last_hist_mtime = hist_mtime
+            try:
+                loadHistory()
+            except Exception:
+                pass
+            try:
+                rebuildMenu(icon)
+            except Exception:
+                pass
+        time.sleep(poll_interval)
+
 def setup(icon):
     loadHistory()
+    getConfig()
     rebuildMenu(icon)
     watcher = Thread(target=clipbWatch, args=(icon,), daemon=True)
     watcher.start()
+    cfg_w = Thread(target=confWatch, args=(icon,), daemon=True)
+    cfg_w.start()
 
 def main():
     check()
-    getConfig()
     image = makeIco()
     icon = pystray.Icon("fch", image, "Clipboard history")
     icon.visible = True

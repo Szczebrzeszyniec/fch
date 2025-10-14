@@ -70,13 +70,18 @@ cat > "$PLIST" <<EOF
 EOF
 
 chmod 644 "$PLIST"
+mkdir -p "$HOME/.ftools/fch"
+if [ -f "icon.png" ]; then
+  install -m 644 "icon.png" "$HOME/.ftools/fch/icon.png"
+else
+  echo "icon cant be copied :(" >&2
+fi
+
 
 launchctl unload "$PLIST" 2>/dev/null || true
 launchctl load "$PLIST"
 
 echo "Autostart enabled via launchd: $PLIST"
 echo "Logs: $OUT_LOG, $ERR_LOG"
-echo ""
-echo "provide an icon at ~/.fch.png"
 
 # ^ to ssie taką masywną pałe że nawet nie wiesz ale sie nie znam tak na bashu :(
