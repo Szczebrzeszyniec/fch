@@ -19,6 +19,7 @@ HISTORY = []
 HISTLIM = 3
 HISTMAX = 8
 HISTSTORE = 0
+CAP = True
 
 def check():
     os.makedirs(os.path.dirname(CONF), exist_ok=True)
@@ -109,38 +110,63 @@ def on_select(icon, text):
 def quit(icon, item=None):
     icon.stop()
 
+def toglCap(icon=None, item=None):
+    global CAP
+    CAP = not CAP
+    rebuildMenu(icon)
+
 def rebuildMenu(icon):
     items = []
     hist = list(reversed(HISTORY))
+
     if len(hist) > HISTLIM:
         visible = hist[:HISTLIM]
         remaining = hist[HISTLIM:HISTMAX]
+
         for entry in visible:
             lbl = label(entry, 40)
+
             def make_cb(t):
                 def cb(*_args, **_kwargs):
                     on_select(icon, t)
                 return cb
+
             items.append(pystray.MenuItem(lbl, make_cb(entry)))
+
         submenu = []
         for entry in remaining:
             lbl = label(entry, 40)
+
             def make_cb(t):
                 def cb(*_args, **_kwargs):
                     on_select(icon, t)
                 return cb
+
             submenu.append(pystray.MenuItem(lbl, make_cb(entry)))
+
         items.append(pystray.MenuItem("More...", pystray.Menu(*submenu)))
+
+        appmenu = []
+        if CAP:
+            appmenu.append(pystray.MenuItem("Stop capture", lambda: toglCap(icon)))
+        else:
+            appmenu.append(pystray.MenuItem("Start capture", lambda: toglCap(icon)))
+
+        appmenu.append(pystray.MenuItem("Configure", confEdit))
+        appmenu.append(pystray.MenuItem("Stop Process", quit))
+        items.append(pystray.MenuItem("Application", pystray.Menu(*appmenu)))
+
     else:
         for entry in hist:
             lbl = label(entry, 40)
+
             def make_cb(t):
                 def cb(*_args, **_kwargs):
                     on_select(icon, t)
                 return cb
+
             items.append(pystray.MenuItem(lbl, make_cb(entry)))
-    items.append(pystray.MenuItem("Configure", confEdit))
-    # items.append(pystray.MenuItem("Quit", quit))
+
     icon.menu = pystray.Menu(*items)
     try:
         icon.update_menu()
@@ -157,6 +183,8 @@ def appendHist(text):
     saveHistory()
 
 def clipbOnchange(new_text, icon):
+    if not CAP:
+        return
     appendHist(new_text)
     rebuildMenu(icon)
 
