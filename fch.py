@@ -145,6 +145,7 @@ def rebuildMenu(icon):
             submenu.append(pystray.MenuItem(lbl, make_cb(entry)))
 
         items.append(pystray.MenuItem("More...", pystray.Menu(*submenu)))
+        items.append(pystray.Menu.SEPARATOR)
 
         appmenu = []
         if CAP:
@@ -153,7 +154,7 @@ def rebuildMenu(icon):
             appmenu.append(pystray.MenuItem("Start capture", lambda: toglCap(icon)))
 
         appmenu.append(pystray.MenuItem("Configure", confEdit))
-        appmenu.append(pystray.MenuItem("Stop Process", quit))
+        appmenu.append(pystray.MenuItem("Exit Process", quit))
         items.append(pystray.MenuItem("Application", pystray.Menu(*appmenu)))
 
     else:
@@ -252,7 +253,7 @@ def setup(icon):
 def main():
     check()
     image = makeIco()
-    icon = pystray.Icon("fch", image, "Clipboard history")
+    icon = pystray.Icon("fch", image, "fch")
     icon.visible = True
     icon.run(setup)
 
